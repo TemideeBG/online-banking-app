@@ -1,0 +1,6 @@
+export enum ACCOUNT_TYPE {
+    CURRENT = 'CURRENT',
+    SAVINGS = 'SAVINGS',
+    DOMICILIARY = 'DOMICILIARY',
+  }
+  
