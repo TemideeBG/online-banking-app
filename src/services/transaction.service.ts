@@ -57,36 +57,48 @@ export class TransactionService  {
           return await transactionRepository.save(createTransaction);
         };
 
-        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '€') {
-          transactionData.conversion_rate = 1,766.98;
-          transactionData.conversion_amount = funds_transferred / transactionData.conversion_rate;
-          if (transactionData.conversion_amount > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.NOT_FOUND, 'Insufficient Funds!!Please enter an amount less than your acc balance');
-          transactionData.bank_charges = 200.00;
-          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, transactionData.conversion_amount, transactionData.bank_charges);
-          return await createAndSaveTransaction();   
+        // Different currency transactions
+        if (findUserBankAccount.currency === '₦') {
+        let conversionRate, conversionAmount;
+      
+        if (findBeneficiaryBankAccount.currency === '€') {
+          conversionRate = 1766.98;
+        } else if (findBeneficiaryBankAccount.currency === '£') {
+          conversionRate = 2095.86;
+        } else if (findBeneficiaryBankAccount.currency === '$') {
+          conversionRate = 1590.63;
         }
 
-        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '$') {
-          transactionData.conversion_rate = 1,590.63;
-          transactionData.conversion_amount = funds_transferred / transactionData.conversion_rate;
-          if (transactionData.conversion_amount > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+        if (conversionRate) {
+          conversionAmount = funds_transferred / conversionRate;
+          transactionData.conversion_rate = conversionRate;
+          transactionData.conversion_amount = conversionAmount;
+          
+          if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.NOT_FOUND, 'Insufficient Funds!!Please enter an amount less than your acc balance');
           transactionData.bank_charges = 200.00;
-          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, transactionData.conversion_amount, transactionData.bank_charges);
-          return await createAndSaveTransaction();   
-        }
 
-        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '₦') {
-        if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!!Please enter an amount less than your acc balance');
-        const bankCharges = {
+          // Deduct funds_transferred from user's account and credit conversion_amount to beneficiary's account
+          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, conversionAmount, transactionData.bank_charges);
+          return await createAndSaveTransaction();   
+      }
+  }
+
+      // Same currency transaction (e.g., ₦ to ₦)
+      if (findUserBankAccount.currency === '₦' && findBeneficiaryBankAccount.currency === '₦') {
+      if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+
+      const bankCharges = {
           sameBank: { low: 30.00, high: 60.00 },
           differentBank: { low: 40.00, high: 80.00 }
-        };
-        
-        const chargeCategory = findUserBankAccount.bank_name === findBeneficiaryBankAccount.bank_name ? 'sameBank' : 'differentBank';
-        transactionData.bank_charges = funds_transferred < 50000 ? bankCharges[chargeCategory].low : bankCharges[chargeCategory].high;
-        await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, transactionData.bank_charges);
-        return await createAndSaveTransaction();
-        }    
+      };
+
+      const chargeCategory = findUserBankAccount.bank_name === findBeneficiaryBankAccount.bank_name ? 'sameBank' : 'differentBank';
+      transactionData.bank_charges = funds_transferred < 50000 ? bankCharges[chargeCategory].low : bankCharges[chargeCategory].high;
+
+      // Deduct funds_transferred from user's account and credit the same amount to beneficiary's account
+      await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, funds_transferred, transactionData.bank_charges);
+      return await createAndSaveTransaction();
+       }
     };
 
     public async getAllTransactions(): Promise<TransactionInterface[]> {
@@ -129,7 +141,8 @@ export class TransactionService  {
         return { msg: `Transaction Associated To: ${req.user.first_name} has been Successfully Deleted` };      
       };
 
-      private async updateAccount(userBankAccount: UserBankAccountEntity, beneficiaryBankAccount: BeneficiaryBankAccountEntity, fundsTransferred: number, bank_charges: number) {
+      private async updateAccount(userBankAccount: UserBankAccountEntity, beneficiaryBankAccount: BeneficiaryBankAccountEntity, 
+                                  fundsTransferred: number, fundsCredited:number, bank_charges: number) {
         // Deduct funds from user account
         userBankAccount.account_balance = parseFloat((userBankAccount.account_balance - fundsTransferred - bank_charges).toFixed(2));
         userBankAccount.amount = `${userBankAccount.currency}${userBankAccount.account_balance.toFixed(2)}`;
@@ -139,7 +152,7 @@ export class TransactionService  {
         const beneficiaryAccountBalance = parseFloat(beneficiaryBankAccount.account_balance.toString());
     
         // Credit funds to beneficiary account
-        beneficiaryBankAccount.account_balance = parseFloat((beneficiaryAccountBalance + fundsTransferred).toFixed(2));
+        beneficiaryBankAccount.account_balance = parseFloat((beneficiaryAccountBalance + fundsCredited).toFixed(2));
         beneficiaryBankAccount.amount = `${beneficiaryBankAccount.currency}${beneficiaryBankAccount.account_balance.toFixed(2)}`;
         console.log(beneficiaryBankAccount.currency,beneficiaryBankAccount.account_balance,beneficiaryBankAccount.amount)
     
@@ -147,41 +160,6 @@ export class TransactionService  {
         await AppDataSource.getRepository(UserBankAccountEntity).save(userBankAccount);
         await AppDataSource.getRepository(BeneficiaryBankAccountEntity).save(beneficiaryBankAccount);
     };
-
-  //   private async handleCurrencyConversionAndCharges(userAccount: UserBankAccountEntity, beneficiaryAccount: BeneficiaryBankAccountEntity, fundsTransferred: number, transactionData: TransactiontDto) {
-  //     // Define conversion rates based on the currencies
-  //     if (userAccount.currency === '₦' && beneficiaryAccount.currency === '€') {
-  //         transactionData.conversion_rate = 1766.98;
-  //     } else if (userAccount.currency === '₦' && beneficiaryAccount.currency === '$') {
-  //         transactionData.conversion_rate = 1590.63;
-  //     }
-  
-  //     if (transactionData.conversion_rate) {
-  //         transactionData.conversion_amount = fundsTransferred / transactionData.conversion_rate;
-  //         transactionData.bank_charges = 200.00;
-  //         if (transactionData.conversion_amount > userAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!! Please enter an amount less than your account balance'); 
-  //         await this.updateAccount(userAccount, beneficiaryAccount, transactionData.conversion_amount, transactionData.bank_charges);
-  //     } else if (userAccount.currency === beneficiaryAccount.currency) {
-  //       // Handle bank charges when both currencies are the same
-  //       if (userAccount.currency === '₦' && beneficiaryAccount.currency === '₦') {
-  //           if (fundsTransferred > userAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!! Please enter an amount less than your account balance');
-          
-  //           const bankCharges = {
-  //               sameBank: { low: 30.00, high: 60.00 },
-  //               differentBank: { low: 40.00, high: 80.00 }
-  //           };
-            
-  //           const chargeCategory = userAccount.bank_name === beneficiaryAccount.bank_name ? 'sameBank' : 'differentBank';
-  //           transactionData.bank_charges = fundsTransferred < 50000.00 ? bankCharges[chargeCategory].low : bankCharges[chargeCategory].high;
-
-  //           await this.updateAccount(userAccount, beneficiaryAccount, fundsTransferred, transactionData.bank_charges);
-  //       } else {
-  //           transactionData.bank_charges = fundsTransferred < 10000.00 ? 50.00 : 100.00;
-  //           await this.updateAccount(userAccount, beneficiaryAccount, fundsTransferred, transactionData.bank_charges);
-  //       }
-  //   }
-  // }
-    
 }
 
 
@@ -217,3 +195,80 @@ export class TransactionService  {
         const savedTransaction = await transactionRepository.save(createTransaction);
 		    return savedTransaction;
         */
+
+
+        //   private async handleCurrencyConversionAndCharges(userAccount: UserBankAccountEntity, beneficiaryAccount: BeneficiaryBankAccountEntity, fundsTransferred: number, transactionData: TransactiontDto) {
+  //     // Define conversion rates based on the currencies
+  //     if (userAccount.currency === '₦' && beneficiaryAccount.currency === '€') {
+  //         transactionData.conversion_rate = 1766.98;
+  //     } else if (userAccount.currency === '₦' && beneficiaryAccount.currency === '$') {
+  //         transactionData.conversion_rate = 1590.63;
+  //     }
+  
+  //     if (transactionData.conversion_rate) {
+  //         transactionData.conversion_amount = fundsTransferred / transactionData.conversion_rate;
+  //         transactionData.bank_charges = 200.00;
+  //         if (transactionData.conversion_amount > userAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!! Please enter an amount less than your account balance'); 
+  //         await this.updateAccount(userAccount, beneficiaryAccount, transactionData.conversion_amount, transactionData.bank_charges);
+  //     } else if (userAccount.currency === beneficiaryAccount.currency) {
+  //       // Handle bank charges when both currencies are the same
+  //       if (userAccount.currency === '₦' && beneficiaryAccount.currency === '₦') {
+  //           if (fundsTransferred > userAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!! Please enter an amount less than your account balance');
+          
+  //           const bankCharges = {
+  //               sameBank: { low: 30.00, high: 60.00 },
+  //               differentBank: { low: 40.00, high: 80.00 }
+  //           };
+            
+  //           const chargeCategory = userAccount.bank_name === beneficiaryAccount.bank_name ? 'sameBank' : 'differentBank';
+  //           transactionData.bank_charges = fundsTransferred < 50000.00 ? bankCharges[chargeCategory].low : bankCharges[chargeCategory].high;
+
+  //           await this.updateAccount(userAccount, beneficiaryAccount, fundsTransferred, transactionData.bank_charges);
+  //       } else {
+  //           transactionData.bank_charges = fundsTransferred < 10000.00 ? 50.00 : 100.00;
+  //           await this.updateAccount(userAccount, beneficiaryAccount, fundsTransferred, transactionData.bank_charges);
+  //       }
+  //   }
+  // }
+    
+  /*
+if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '€') {
+          transactionData.conversion_rate = 1766.98;
+          transactionData.conversion_amount = funds_transferred / transactionData.conversion_rate;
+          if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.NOT_FOUND, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+          transactionData.bank_charges = 200.00;
+          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, transactionData.conversion_amount, transactionData.bank_charges);
+          return await createAndSaveTransaction();   
+        }
+
+        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '£') {
+          transactionData.conversion_rate = 2095.86;
+          transactionData.conversion_amount = funds_transferred / transactionData.conversion_rate;
+          if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.NOT_FOUND, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+          transactionData.bank_charges = 200.00;
+          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, transactionData.conversion_amount, transactionData.bank_charges);
+          return await createAndSaveTransaction();   
+        }
+
+        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '$') {
+          transactionData.conversion_rate = 1590.63;
+          transactionData.conversion_amount = funds_transferred / transactionData.conversion_rate;
+          if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+          transactionData.bank_charges = 200.00;
+          await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, transactionData.conversion_amount, transactionData.bank_charges);
+          return await createAndSaveTransaction();   
+        }
+
+        if (findUserBankAccount.currency == '₦' && findBeneficiaryBankAccount.currency == '₦') {
+        if (funds_transferred > findUserBankAccount.account_balance) throw new HttpException(StatusCodes.BAD_REQUEST, 'Insufficient Funds!!Please enter an amount less than your acc balance');
+        const bankCharges = {
+          sameBank: { low: 30.00, high: 60.00 },
+          differentBank: { low: 40.00, high: 80.00 }
+        };
+        
+        const chargeCategory = findUserBankAccount.bank_name === findBeneficiaryBankAccount.bank_name ? 'sameBank' : 'differentBank';
+        transactionData.bank_charges = funds_transferred < 50000 ? bankCharges[chargeCategory].low : bankCharges[chargeCategory].high;
+        await this.updateAccount(findUserBankAccount, findBeneficiaryBankAccount, funds_transferred, funds_transferred, transactionData.bank_charges);
+        return await createAndSaveTransaction();
+        }    
+  */
