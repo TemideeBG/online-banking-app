@@ -27,8 +27,8 @@ const transactionRoute = new TransactionRoute();
 
 app.get("/api/v1", (req, res) => {
   res.json({
-      message: "ONLINE-BANKING APP V1, [Health check::: API up and running]"
-      //postmanLink: "https://www.postman.com/galactic-resonance-793427/workspace/e-commerce/collection/26636754-fdf9de40-f835-40d4-acf2-4d54c29b450b?action=share&creator=26636754"
+      message: "ONLINE-BANKING APP V1, [Health check::: API up and running]",
+      postmanLink: "https://galactic-resonance-793427.postman.co/workspace/shopping-cart-~9a5e7afb-f90e-45ee-9a95-a083095a36e2/collection/26636754-d2c69bef-bc21-4064-b743-6194010cd166?action=share&creator=26636754"
   })
 });
 

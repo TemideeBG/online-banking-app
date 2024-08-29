@@ -2,6 +2,8 @@
 
 ## User Story
 
+- The Online Banking Application is a comprehensive platform designed to facilitate seamless and secure financial transactions between users and their beneficiaries. 
+- It allows users to manage their personal and banking information, create and maintain multiple bank accounts, and conduct various financial transactions with ease.
 - The main objective of this project is to create an elementary implementation of an online banking application, which are heavily used by present-day banking organizations world-wide. 
 - By studying examples from real world running instances of e-banking application, this thesis tried to achieve the characteristics and functionalities of a typical web based online banking software.
 - Using popular frameworks and technologies in the web development field such as Typescript, React, Express, PostgreSQL and many more.
