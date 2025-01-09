@@ -13,10 +13,12 @@
 ## Requirement Analysis
 
 - Users should be fill in the form with validated data to create a User Account.
+- Users get a mail with an otp for them to verify their account.
 - User fill in the form with validated data to be able to access protected resources of the application.
 - User clicks the Logout button to destroy the session and revoking his rights to access protected resources.
 - User must login if he wishes to access protected resources of the application. This is done using session ID and/or user ID.
 - User can view and edit his User Information.
+- As a user, I need to manage the bank accounts of my beneficiaries to whom I will be transferring funds. I should be able to add, view, update, or delete beneficiary accounts as     necessary.
 - User can perform a financial transaction by fill in a form with validated data.
 - User can see his balance changed and new transactions if he is involved in a financial transaction.
 - User can list all the Financial Transaction records that related to him

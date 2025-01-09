@@ -55,7 +55,32 @@ export class BeneficiaryBankAccountService  {
         const findUser = await this.userService.getSingleUser(userId,req);
         if(!findUser) throw new HttpException(StatusCodes.NOT_FOUND, 'User not found!!Please enter valid user id');
         const beneficiaryBankAccountRepository = AppDataSource.getRepository(this.beneficiaryBankAccounts);
-        const beneficiaryAccount = await beneficiaryBankAccountRepository.findOne({ where: { id: beneficiaryBank_id }, relations: ['userInfo'] });
+        const beneficiaryAccount = await beneficiaryBankAccountRepository.createQueryBuilder('beneficiary_bank_account').leftJoinAndSelect('beneficiary_bank_account.userInfo', 'userInfo')
+        .select([
+          'beneficiary_bank_account.id',
+          'beneficiary_bank_account.account_name',
+          'beneficiary_bank_account.account_number',
+          'beneficiary_bank_account.starting_balance',
+          'beneficiary_bank_account.account_balance',
+          'beneficiary_bank_account.currency',
+          'beneficiary_bank_account.amount',
+          'beneficiary_bank_account.account_type',
+          'beneficiary_bank_account.bank_name',
+          'beneficiary_bank_account.iban',
+          'beneficiary_bank_account.swift_bic',
+          'beneficiary_bank_account.country', 
+          'beneficiary_bank_account.taxExempt',
+          'userInfo.id',
+          'userInfo.first_name', // Load specific fields from UserInfo
+          'userInfo.last_name',
+          'userInfo.phone_number',
+          'userInfo.home_address',
+          'userInfo.state_of_residence',
+          // Add more fields from BusinessOwner as needed
+        ])
+        .where('beneficiary_bank_account.id = :beneficiaryBank_id', { beneficiaryBank_id })
+        .getOne();
+       // const beneficiaryAccount = await beneficiaryBankAccountRepository.findOne({ where: { id: beneficiaryBank_id }, relations: ['userInfo'] });
         console.log(findUser,beneficiaryAccount)
         if(!beneficiaryAccount) throw new HttpException(StatusCodes.NOT_FOUND, 'Beneficiary Account associated to user not found!!Please enter valid user account id');
         const hasSuperAdminRole = req.user.role.includes(USER_ROLES.SUPER_ADMIN);
